@@ -14,7 +14,7 @@ def main():
     print("Start", time.ctime())
 
     # Load configuration from the file
-    config = read_config_from_file('config.json')
+    config = read_config_from_file('pdf_scraper/config.json')
 
     # List of websites to scrape
     websites = read_websites_from_file(config["websites_file"])

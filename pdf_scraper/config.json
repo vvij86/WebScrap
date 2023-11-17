@@ -1,0 +1,4 @@
+{
+    "max_threads": 3,
+    "websites_file": "clients.txt"
+}
