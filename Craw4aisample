@@ -4,37 +4,38 @@ from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.content_filter_strategy import LLMContentFilter
 
 async def main():
-    # Configure the browser to run headless with an extended timeout (600 seconds = 10 minutes)
+    # Configure the browser with a 10-minute timeout
     browser_config = BrowserConfig(
         headless=True,
         verbose=True,
-        # Adjust timeout as needed; this is typically in seconds
-        timeout=600  
+        timeout=600  # seconds
     )
     
-    # Create a run configuration that:
-    # - Uses a DefaultMarkdownGenerator with LLMContentFilter and a focused instruction.
-    # - Bypasses caching to force fresh loading.
-    # - Optionally, you can include additional options (like waiting for network idle)
+    # Create a run configuration with a custom markdown generator that uses the LLMContentFilter.
+    # Here we specify the Azure OpenAI parameters for the O3 Mini model.
     run_config = CrawlerRunConfig(
         markdown_generator=DefaultMarkdownGenerator(
             content_filter=LLMContentFilter(
-                instruction="Extract the news article content in a concise and clear manner, including only the main text, all image URLs, and all hyperlinks present on the page."
+                instruction="Extract the news article content in a concise and clear manner, including only the main text, all image URLs, and all hyperlinks present on the page.",
+                provider="azure/openai",
+                api_key="YOUR_API_KEY",            # Replace with your Azure OpenAI API key
+                endpoint="YOUR_ENDPOINT",          # e.g., "https://your-resource-name.openai.azure.com/"
+                model="o3-mini",                   # Specify the model name
+                api_version="YOUR_API_VERSION"     # e.g., "2023-03-15-preview"
             )
         ),
         cache_mode=CacheMode.BYPASS,
-        # If your target page needs to fully load dynamic content, you can try:
-        wait_until="networkidle"  # This ensures the crawler waits until network activity subsides.
+        wait_until="networkidle"  # Wait until network activity subsides
     )
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
-        # Replace with the actual URL of the news website you wish to scrape.
+        # Replace with the actual news page URL
         result = await crawler.arun(
             url="https://example.com/news",
             config=run_config,
-            magic=True  # Optional: enables additional heuristics.
+            magic=True  # Enables additional heuristics if needed
         )
-        # Print extracted Markdown (content), image URLs, and links.
+        # Print the results: Markdown content, image URLs, and links.
         print("Extracted Markdown:")
         print(result.markdown)
         print("\nExtracted Image URLs:")
