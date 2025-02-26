@@ -1,0 +1,46 @@
+import asyncio
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+from crawl4ai.content_filter_strategy import LLMContentFilter
+
+async def main():
+    # Configure the browser to run headless with an extended timeout (600 seconds = 10 minutes)
+    browser_config = BrowserConfig(
+        headless=True,
+        verbose=True,
+        # Adjust timeout as needed; this is typically in seconds
+        timeout=600  
+    )
+    
+    # Create a run configuration that:
+    # - Uses a DefaultMarkdownGenerator with LLMContentFilter and a focused instruction.
+    # - Bypasses caching to force fresh loading.
+    # - Optionally, you can include additional options (like waiting for network idle)
+    run_config = CrawlerRunConfig(
+        markdown_generator=DefaultMarkdownGenerator(
+            content_filter=LLMContentFilter(
+                instruction="Extract the news article content in a concise and clear manner, including only the main text, all image URLs, and all hyperlinks present on the page."
+            )
+        ),
+        cache_mode=CacheMode.BYPASS,
+        # If your target page needs to fully load dynamic content, you can try:
+        wait_until="networkidle"  # This ensures the crawler waits until network activity subsides.
+    )
+
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        # Replace with the actual URL of the news website you wish to scrape.
+        result = await crawler.arun(
+            url="https://example.com/news",
+            config=run_config,
+            magic=True  # Optional: enables additional heuristics.
+        )
+        # Print extracted Markdown (content), image URLs, and links.
+        print("Extracted Markdown:")
+        print(result.markdown)
+        print("\nExtracted Image URLs:")
+        print(result.media.get('images', []))
+        print("\nExtracted Links:")
+        print(result.links)
+
+if __name__ == "__main__":
+    asyncio.run(main())
