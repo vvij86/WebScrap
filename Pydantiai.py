@@ -1,12 +1,13 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
-import openai
 import pandas as pd
 import fitz  # PyMuPDF
 import os
 from dotenv import load_dotenv
+import openai
+from pydantic_ai import Agent, OpenAIModel
 
 # Load environment variables from .env file
 load_dotenv()
@@ -14,12 +15,37 @@ load_dotenv()
 # Initialize FastAPI app
 app = FastAPI()
 
-# Set OpenAI API key from environment variable
-openai.api_key = os.getenv('OPENAI_API_KEY')
+# Set OpenAI API key and endpoint from environment variables
+openai.api_type = "azure"
+openai.api_key = os.getenv('AZURE_OPENAI_API_KEY')
+openai.api_base = os.getenv('AZURE_OPENAI_ENDPOINT')
+openai.api_version = "2024-08-01-preview"  # Use the appropriate API version
 
-# Define Pydantic model for questions
-class Questions(BaseModel):
-    questions: List[str]
+# Define Pydantic model for structured response
+class Answer(BaseModel):
+    question: str = Field(description="The question posed")
+    answer: str = Field(description="The answer to the question")
+
+# Custom OpenAI client for Azure
+class AzureOpenAIClient:
+    def __init__(self, deployment_name: str):
+        self.deployment_name = deployment_name
+
+    def create_completion(self, prompt: str, **kwargs):
+        response = openai.Completion.create(
+            engine=self.deployment_name,
+            prompt=prompt,
+            **kwargs
+        )
+        return response
+
+# Initialize PydanticAI Agent with custom OpenAI client
+azure_openai_client = AzureOpenAIClient(deployment_name=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'))
+agent = Agent(
+    model=OpenAIModel(client=azure_openai_client),
+    system_prompt='You are an assistant extracting information from a PDF document to answer specific questions.',
+    result_type=Answer,
+)
 
 # Function to extract text from PDF
 def extract_text_from_pdf(pdf_file: UploadFile) -> str:
@@ -33,19 +59,11 @@ def extract_text_from_pdf(pdf_file: UploadFile) -> str:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading PDF file: {e}")
 
-# Function to get answer from GPT-4
-def get_answer_from_gpt4(question: str, context: str) -> str:
+# Function to get answer from PydanticAI Agent
+async def get_answer_from_agent(question: str, context: str) -> str:
     try:
-        prompt = f"Context: {context}\n\nQuestion: {question}\nAnswer:"
-        response = openai.Completion.create(
-            model="gpt-4",
-            prompt=prompt,
-            max_tokens=150,
-            n=1,
-            stop=None,
-            temperature=0.5,
-        )
-        return response.choices[0].text.strip()
+        result = await agent.run(question, context=context)
+        return result.data.answer
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating answer: {e}")
 
@@ -62,7 +80,7 @@ async def process_pdf(
     questions_list = questions.split("\n")
 
     # Generate answers
-    answers = [get_answer_from_gpt4(question, pdf_text) for question in questions_list]
+    answers = [await get_answer_from_agent(question, pdf_text) for question in questions_list]
 
     # Create a DataFrame
     df = pd.DataFrame([answers], columns=questions_list)
