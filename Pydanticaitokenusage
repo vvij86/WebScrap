@@ -1,0 +1,10 @@
+# Access specific token usage details
+input_tokens = usage_stats.input_tokens
+output_tokens = usage_stats.output_tokens
+total_tokens = usage_stats.total_tokens
+
+# Display the agent's response and token usage information
+print(f"Agent Response: {result.data}")
+print(f"Input Tokens: {input_tokens}")
+print(f"Output Tokens: {output_tokens}")
+print(f"Total Tokens: {total_tokens}")
